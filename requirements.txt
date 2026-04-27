@@ -1,0 +1,9 @@
+# LabelKit data preparation dependencies (for local use)
+# In Colab, these are already available or can be installed with !pip install
+
+google-api-python-client>=2.0.0
+google-auth-oauthlib>=1.0.0
+google-auth>=2.0.0
+pandas>=1.3.0
+tqdm>=4.0.0
+googletrans==4.0.0-rc1

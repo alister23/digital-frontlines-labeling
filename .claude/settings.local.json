@@ -1,0 +1,16 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(pip install *)",
+      "Bash(python3 -c ' *)",
+      "Bash(python3 -m pip install openpyxl -q)",
+      "Bash(npm --version)",
+      "Bash(npm install *)",
+      "Bash(npx tsc *)",
+      "Bash(echo \"Exit: $?\")",
+      "Bash(npm run *)",
+      "Bash(curl *)",
+      "Bash(xargs kill *)"
+    ]
+  }
+}
