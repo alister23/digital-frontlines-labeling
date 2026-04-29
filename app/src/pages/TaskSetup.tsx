@@ -104,7 +104,8 @@ interface DatasetSectionProps {
 
 function DatasetSection({ taskId, userEmail, onDatapointsChange }: DatasetSectionProps) {
   const { googleClientId, driveImagesFolderId, driveMessagesFolderId, defaultMessagesFolderId, setDriveFolderIds } = useStore()
-  const [activeTab, setActiveTab] = useState<DataTab>(googleClientId ? 'drive' : 'upload')
+  const effectiveClientId = (import.meta.env.VITE_GOOGLE_CLIENT_ID as string) || googleClientId
+  const [activeTab, setActiveTab] = useState<DataTab>(effectiveClientId ? 'drive' : 'upload')
   const [existingDataset, setExistingDataset] = useState<{ count: number; loadedBy: string; loadedAt: string } | null>(null)
   const [loadingExisting, setLoadingExisting] = useState(hasSupabase)
   const [showLoader, setShowLoader] = useState(false)
@@ -205,9 +206,9 @@ function DatasetSection({ taskId, userEmail, onDatapointsChange }: DatasetSectio
           </div>
 
           {activeTab === 'drive' && (
-            googleClientId ? (
+            effectiveClientId ? (
               <DriveLoader
-                clientId={googleClientId}
+                clientId={effectiveClientId}
                 initialImagesFolderId={driveImagesFolderId}
                 initialMessagesFolderId={driveMessagesFolderId}
                 defaultMessagesFolderId={defaultMessagesFolderId}

@@ -1,10 +1,76 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useStore } from '../store'
 import { DetailView } from './DetailView'
 import { TableView } from './TableView'
 import { dbCreateSubmission } from '../lib/db'
 import { hasSupabase } from '../lib/supabase'
 import type { ExportedSession } from '../types'
+
+function DriveConnectBanner() {
+  const { driveToken, googleClientId, setDriveToken, datapoints } = useStore()
+  const [status, setStatus] = useState<'idle' | 'waiting' | 'error'>('idle')
+  const [gisReady, setGisReady] = useState(false)
+
+  const effectiveClientId = (import.meta.env.VITE_GOOGLE_CLIENT_ID as string) || googleClientId
+  const needsDrive = datapoints.some(
+    dp => typeof dp.imageUrl === 'string' && (dp.imageUrl as string).startsWith('drive://')
+  )
+
+  useEffect(() => {
+    if (!needsDrive || driveToken || !effectiveClientId) return
+    const check = () => {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      if (typeof google !== 'undefined' && (google as any).accounts?.oauth2) {
+        setGisReady(true)
+      } else {
+        setTimeout(check, 200)
+      }
+    }
+    check()
+  }, [needsDrive, driveToken, effectiveClientId])
+
+  if (!needsDrive || driveToken) return null
+
+  if (!effectiveClientId) {
+    return (
+      <div className="flex-shrink-0 bg-amber-950/30 border-b border-amber-700/30 px-6 py-2 text-xs text-amber-400/80">
+        Images require Google Drive — add a Google Client ID in Settings to connect.
+      </div>
+    )
+  }
+
+  const handleConnect = () => {
+    if (!gisReady) return
+    setStatus('waiting')
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const tokenClient = (google as any).accounts.oauth2.initTokenClient({
+      client_id: effectiveClientId,
+      scope: 'https://www.googleapis.com/auth/drive.readonly',
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      callback: (response: any) => {
+        if (response.error) { setStatus('error'); return }
+        setDriveToken(response.access_token)
+      },
+      error_callback: () => setStatus('idle'),
+    })
+    tokenClient.requestAccessToken({ prompt: '' })
+  }
+
+  return (
+    <div className="flex-shrink-0 bg-amber-950/30 border-b border-amber-700/30 px-6 py-2.5 flex items-center justify-between gap-4">
+      <p className="text-xs text-amber-400/90">
+        {status === 'error' ? 'Google sign-in failed — try again.' : 'Sign in with Google to load images from Drive.'}
+      </p>
+      <button
+        onClick={handleConnect}
+        disabled={!gisReady || status === 'waiting'}
+        className="px-3 py-1 text-xs font-medium bg-amber-800/40 hover:bg-amber-700/50 disabled:opacity-50 text-amber-200 rounded-md transition-colors whitespace-nowrap flex-shrink-0"
+      >
+        {status === 'waiting' ? 'Waiting…' : 'Connect Drive'}
+      </button>
+    </div>
+  )
+}
 
 function downloadJson(data: object, filename: string) {
   const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' })
@@ -147,6 +213,8 @@ export function LabelingPage() {
           )}
         </div>
       </header>
+
+      <DriveConnectBanner />
 
       <div className="flex-1 overflow-hidden">
         {viewMode === 'detail' ? (
