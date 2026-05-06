@@ -1,6 +1,27 @@
 import type { Datapoint } from '../types'
+import { supabase, hasSupabase } from './supabase'
 
 const DRIVE = 'https://www.googleapis.com/drive/v3'
+const STORAGE_BUCKET = 'task-images'
+
+async function uploadToStorage(taskId: string, fileId: string, token: string): Promise<string | null> {
+  try {
+    const res = await fetch(`${DRIVE}/files/${fileId}?alt=media`, {
+      headers: { Authorization: `Bearer ${token}` },
+    })
+    if (!res.ok) return null
+    const blob = await res.blob()
+    const path = `${taskId}/${fileId}`
+    const { error } = await supabase.storage
+      .from(STORAGE_BUCKET)
+      .upload(path, blob, { upsert: true, contentType: blob.type || 'image/jpeg' })
+    if (error) return null
+    const { data } = supabase.storage.from(STORAGE_BUCKET).getPublicUrl(path)
+    return data.publicUrl
+  } catch {
+    return null
+  }
+}
 
 interface DriveFile {
   id: string
@@ -189,6 +210,7 @@ export async function loadFromDrive(
   messagesFolderId: string,
   token: string,
   onProgress: (msg: string) => void,
+  taskId?: string,
 ): Promise<DriveLoadResult> {
   // 1. List images
   onProgress('Listing images…')
@@ -201,7 +223,7 @@ export async function loadFromDrive(
   // 2. Build caption index from messages folder
   const captionIndex = await buildCaptionIndex(messagesFolderId, token, onProgress)
 
-  // 3. Match
+  // 3. Match images to captions
   onProgress('Matching images to captions…')
   let withCaption = 0
 
@@ -221,6 +243,20 @@ export async function loadFromDrive(
       postId: postId ?? undefined,
     }
   })
+
+  // 4. Upload images to Supabase Storage so labelers don't need Drive auth
+  if (taskId && hasSupabase) {
+    const BATCH = 8
+    for (let i = 0; i < images.length; i += BATCH) {
+      onProgress(`Uploading images… ${Math.min(i + BATCH, images.length)} / ${images.length}`)
+      await Promise.all(
+        images.slice(i, i + BATCH).map(async (file, j) => {
+          const url = await uploadToStorage(taskId, file.id, token)
+          if (url) datapoints[i + j].imageUrl = url
+        })
+      )
+    }
+  }
 
   return {
     datapoints,

@@ -5,6 +5,7 @@ import type { Datapoint } from '../types'
 
 interface Props {
   clientId: string
+  taskId: string
   initialImagesFolderId: string
   initialMessagesFolderId: string
   defaultMessagesFolderId: string
@@ -13,7 +14,7 @@ interface Props {
 
 type Status = 'idle' | 'authing' | 'loading' | 'translating' | 'done' | 'error'
 
-export function DriveLoader({ clientId, initialImagesFolderId, initialMessagesFolderId, defaultMessagesFolderId, onLoaded }: Props) {
+export function DriveLoader({ clientId, taskId, initialImagesFolderId, initialMessagesFolderId, defaultMessagesFolderId, onLoaded }: Props) {
   const { setDriveToken } = useStore()
   const [imagesFolderId, setImagesFolderId] = useState(initialImagesFolderId)
   const [messagesFolderId, setMessagesFolderId] = useState(initialMessagesFolderId || defaultMessagesFolderId)
@@ -53,6 +54,7 @@ export function DriveLoader({ clientId, initialImagesFolderId, initialMessagesFo
         effectiveMessagesFolderId.trim(),
         token,
         setProgress,
+        taskId,
       )
       setStats(result.stats)
       setStatus('translating')

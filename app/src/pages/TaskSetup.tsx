@@ -209,6 +209,7 @@ function DatasetSection({ taskId, userEmail, onDatapointsChange }: DatasetSectio
             effectiveClientId ? (
               <DriveLoader
                 clientId={effectiveClientId}
+                taskId={taskId}
                 initialImagesFolderId={driveImagesFolderId}
                 initialMessagesFolderId={driveMessagesFolderId}
                 defaultMessagesFolderId={defaultMessagesFolderId}

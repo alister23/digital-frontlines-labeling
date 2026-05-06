@@ -131,3 +131,31 @@ drop policy if exists "progress all" on progress;
 create policy "progress all" on progress for all to authenticated
   using (user_id = auth.uid())
   with check (user_id = auth.uid());
+
+-- ── Storage: task images ───────────────────────────────────────────────────────
+-- Images uploaded from Google Drive during task creation are stored here.
+-- Bucket is public so labelers can load images without any auth.
+
+insert into storage.buckets (id, name, public)
+values ('task-images', 'task-images', true)
+on conflict (id) do nothing;
+
+drop policy if exists "task-images public read" on storage.objects;
+drop policy if exists "task-images auth upload" on storage.objects;
+drop policy if exists "task-images auth update" on storage.objects;
+drop policy if exists "task-images auth delete" on storage.objects;
+
+create policy "task-images public read" on storage.objects
+  for select using (bucket_id = 'task-images');
+
+create policy "task-images auth upload" on storage.objects
+  for insert to authenticated
+  with check (bucket_id = 'task-images');
+
+create policy "task-images auth update" on storage.objects
+  for update to authenticated
+  using (bucket_id = 'task-images');
+
+create policy "task-images auth delete" on storage.objects
+  for delete to authenticated
+  using (bucket_id = 'task-images');
