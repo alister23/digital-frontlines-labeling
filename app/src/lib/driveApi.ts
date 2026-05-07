@@ -5,22 +5,18 @@ const DRIVE = 'https://www.googleapis.com/drive/v3'
 const STORAGE_BUCKET = 'task-images'
 
 async function uploadToStorage(taskId: string, fileId: string, token: string): Promise<string | null> {
-  try {
-    const res = await fetch(`${DRIVE}/files/${fileId}?alt=media`, {
-      headers: { Authorization: `Bearer ${token}` },
-    })
-    if (!res.ok) return null
-    const blob = await res.blob()
-    const path = `${taskId}/${fileId}`
-    const { error } = await supabase.storage
-      .from(STORAGE_BUCKET)
-      .upload(path, blob, { upsert: true, contentType: blob.type || 'image/jpeg' })
-    if (error) return null
-    const { data } = supabase.storage.from(STORAGE_BUCKET).getPublicUrl(path)
-    return data.publicUrl
-  } catch {
-    return null
-  }
+  const res = await fetch(`${DRIVE}/files/${fileId}?alt=media`, {
+    headers: { Authorization: `Bearer ${token}` },
+  })
+  if (!res.ok) throw new Error(`Drive download failed for ${fileId}: HTTP ${res.status}`)
+  const blob = await res.blob()
+  const path = `${taskId}/${fileId}`
+  const { error } = await supabase.storage
+    .from(STORAGE_BUCKET)
+    .upload(path, blob, { upsert: true, contentType: blob.type || 'image/jpeg' })
+  if (error) throw new Error(`Storage upload failed for ${fileId}: ${error.message}`)
+  const { data } = supabase.storage.from(STORAGE_BUCKET).getPublicUrl(path)
+  return data.publicUrl
 }
 
 interface DriveFile {
@@ -247,13 +243,26 @@ export async function loadFromDrive(
   // 4. Upload images to Supabase Storage so labelers don't need Drive auth
   if (taskId && hasSupabase) {
     const BATCH = 8
+    const errors: string[] = []
     for (let i = 0; i < images.length; i += BATCH) {
       onProgress(`Uploading images… ${Math.min(i + BATCH, images.length)} / ${images.length}`)
       await Promise.all(
         images.slice(i, i + BATCH).map(async (file, j) => {
-          const url = await uploadToStorage(taskId, file.id, token)
-          if (url) datapoints[i + j].imageUrl = url
+          try {
+            const url = await uploadToStorage(taskId, file.id, token)
+            if (url) datapoints[i + j].imageUrl = url
+          } catch (e) {
+            errors.push(e instanceof Error ? e.message : String(e))
+          }
         })
+      )
+    }
+    if (errors.length > 0) {
+      console.error('Storage upload errors:', errors)
+      throw new Error(
+        `${errors.length} image${errors.length !== 1 ? 's' : ''} failed to upload to Supabase Storage.\n` +
+        `Make sure the "task-images" bucket exists (re-run supabase-schema.sql).\n` +
+        `First error: ${errors[0]}`
       )
     }
   }
